@@ -1,49 +1,68 @@
 # http-server-arep
 
-Servidor HTTP mínimo en Java (clase principal [`escuelaing.edu.co.HttpServer`](src/main/java/escuelaing/edu/co/HttpServer.java)) que sirve archivos estáticos y gestiona una ruta `/books` para guardar nombres en memoria. Puerto por defecto: `35000`.
+Servidor HTTP mínimo en Java — clase principal: `escuelaing.edu.co.HttpServer` (`src/main/java/escuelaing/edu/co/HttpServer.java`). Puerto por defecto: `35000`.
 
 ## Requisitos
 
-* JDK 17 instalado y `JAVA_HOME` apuntando al JDK.
+* JDK 17 instalado; `JAVA_HOME` apuntando al JDK.
 * Maven 3.x.
-* Ejecutar desde la raíz del proyecto (donde está [`pom.xml`](pom.xml)).
+* Ejecutar desde la raíz del proyecto (donde está `pom.xml`).
 
-## Instalación y ejecución (PowerShell)
+## Ejecución desde IDE (NetBeans / IntelliJ)
+
+Asegura JDK 17 y Maven configurados en el proyecto.
+
+### NetBeans
+
+![NetBeans configuración](src/main/resources/images/img_9.png)
+
+### IntelliJ IDEA
+
+![IntelliJ configuración 1](src/main/resources/images/img_10.png)
+
+![IntelliJ configuración 2](src/main/resources/images/img_11.png)
+
+Para ejecutar: usa la opción Run/Execute del IDE.
+
+## Ejecución (PowerShell)
 
 ```powershell
-# compilar
-mvn compile
+# Instalar dependencias (desde la raíz del proyecto)
+mvn install
 
-# ejecutar en desarrollo (plugin exec)
-mvn -Dexec.mainClass="escuelaing.edu.co.HttpServer" org.codehaus.mojo:exec-maven-plugin:3.1.0:java
+# Limpiar y construir el JAR
+mvn clean package
 
-# empaquetar
-mvn package
-
-# ejecutar el JAR generado
+# Ejecutar el servidor
 java -jar target/http-server-arep-1.0-SNAPSHOT.jar
 ```
 
-Parar: `GET /stop` o `Ctrl+C`.
+Imágenes de ejemplo (ejecución):
+
+![mvn install](src/main/resources/images/img_6.png)
+![mvn package](src/main/resources/images/img_7.png)
+![java -jar](src/main/resources/images/img_8.png)
+
+**Detener el servidor:** `GET /stop` o `Ctrl+C`.
 
 ## Arquitectura (resumen)
 
-* Entrada: `ServerSocket` en puerto 35000.
-* Routing: extracción de la ruta con `uri.split("\?")[0]` y `switch` por path.
-* Recursos: servir archivos desde `src/main/resources`.
-* Estado: `List<String> box` en memoria para `/books` (no persistente porque lo alojo en memoria, es decir, mientras corre la aplicación).
-* Detener: `ServerSocket.close()` en `/stop` (para detenerlo se consulta la ruta [`localhost:35000/stop`](http://localhost:35000/stop)).
-* Limitaciones: sin pool de hilos, parsing HTTP mínimo, sin seguridad ni validación (tampoco es concurrente por lo que solo maneja una solicitud a la vez).
+* **Entrada:** `ServerSocket` en puerto `35000`.
+* **Routing:** se extrae la ruta con `uri.split("?")[0]` y se hace `switch` por path.
+* **Recursos:** archivos en `src/main/resources` (usar `getResourceAsStream` para que funcione empaquetado en JAR).
+* **Estado:** `List<String> box` en memoria para `/books` — no persistente.
+* **Detener:** ruta `http://localhost:35000/stop` cierra el `ServerSocket`.
+* **Limitaciones:** sin pool de hilos, parsing HTTP minimalista, sin validación de entradas; solo maneja una solicitud a la vez.
 
 ## Evaluación / Pruebas (plantilla)
 
-* **PRUEBAS:**
+* **Objetivo:**
+* **Pasos:**
+* **Entrada:**
+* **Resultado esperado:**
+* **Resultado obtenido:**
+* **Comentarios:**
 
-    * **Objetivo:**
-    * **Pasos:**
-    * **Entrada:**
-    * **Resultado esperado:**
-    * **Resultado obtenido:**
-    * **Comentarios:**
+## TODO
 
-## TODO --> Anexar las pruebas realizadas y habilitar rutas para obtener imágenes.
+Adjuntar pruebas realizadas y habilitar rutas para servir las imágenes del README si se desea mostrarlas desde el JAR.
