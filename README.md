@@ -54,6 +54,10 @@ Imágenes de ejemplo (ejecución):
 * **Detener:** ruta `http://localhost:35000/stop` cierra el `ServerSocket`.
 * **Limitaciones:** sin pool de hilos, parsing HTTP minimalista, sin validación de entradas; solo maneja una solicitud a la vez.
 
+La arquitectura es simple y directa, enfocada en la funcionalidad básica de un servidor HTTP usando un socket para mantener la comunicación con el cliente y luego cerrarlo al terminar la comunicación.
+
+![![Arquitectura](src/main/resources/images/img_12.png)](src/main/resources/images/img_20.png)
+
 ## Pruebas
 Para probar el servidor se pueden usar herramientas como Postman o cURL.
 Pero en este caso podemos hacerlo desde el navegador web:
