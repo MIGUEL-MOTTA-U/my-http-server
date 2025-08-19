@@ -54,15 +54,29 @@ Imágenes de ejemplo (ejecución):
 * **Detener:** ruta `http://localhost:35000/stop` cierra el `ServerSocket`.
 * **Limitaciones:** sin pool de hilos, parsing HTTP minimalista, sin validación de entradas; solo maneja una solicitud a la vez.
 
-## Evaluación / Pruebas (plantilla)
+## Pruebas
+Para probar el servidor se pueden usar herramientas como Postman o cURL.
+Pero en este caso podemos hacerlo desde el navegador web:
 
-* **Objetivo:**
-* **Pasos:**
-* **Entrada:**
-* **Resultado esperado:**
-* **Resultado obtenido:**
-* **Comentarios:**
+### Probando un recurso `html` como [localhost:35000/index.html](`http://localhost:35000/index.html`):
+![Prueba recurso HTML](src/main/resources/images/img_13.png)
 
-## TODO
+### Probando un recurso rest que retorna un recurso `html` como [localhost:35000/about](`http://localhost:35000/about`)
+![Prueba recurso HTML](src/main/resources/images/img_14.png)
 
-Adjuntar pruebas realizadas y habilitar rutas para servir las imágenes del README si se desea mostrarlas desde el JAR.
+### Probando un recurso de imagen formato `png` []()`http://localhost:35000/images/img.png`:
+![Prueba recurso imagen](src/main/resources/images/img_15.png)
+
+![Prueba recurso imagen](src/main/resources/images/img_16.png)
+
+### Probando un recurso de tipo `css` como [localhost:35000/api/styles.css](`http://localhost:35000/api/styles.css`):
+
+![Prueba recurso CSS](src/main/resources/images/img_17.png)
+
+### Probando un recurso de tipo `JSON` como [`/books?name=Boulevard`](`http://localhost:35000/books?name=Boulevard`) por medio de un recurso REST expuesto:
+
+![Prueba recurso JSON](src/main/resources/images/img_18.png)
+
+### Para facilitar el proceso se ofrece un recurso REST con los recursos descritos anteriormente, junto con una ruta para detener el servidor.
+
+![Prueba recurso REST](src/main/resources/images/img_19.png)

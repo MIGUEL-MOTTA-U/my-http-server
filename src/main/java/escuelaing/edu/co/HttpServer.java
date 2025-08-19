@@ -1,5 +1,6 @@
 package escuelaing.edu.co;
 
+import escuelaing.edu.co.errors.HttpServerErrors;
 import java.net.*;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -17,16 +18,14 @@ public class HttpServer {
     private static final Logger logger = Logger.getLogger(HttpServer.class.getName());
     private static boolean running = true;
     private static final List<String> box = new ArrayList<>();
+    private static final String RESOURCES_PATH = "src/main/resources";
 
     /**
      * Main method to start the HTTP server.
      * The server listens on port 35000 and handles incoming requests. It won't stop until the "/stop" route is accessed.
      * @param args command line arguments (not used)
-     * @throws IOException if an I/O error occurs when opening the socket
      */
-    public static void main(String[] args) throws IOException {
-
-
+    public static void main(String[] args) {
         ServerSocket serverSocket = null;
         try {
             serverSocket = new ServerSocket(35000);
@@ -38,12 +37,19 @@ public class HttpServer {
         Socket clientSocket = null;
         int i = 0;
         while (running){
-            i++;
-            logger.info("Number of connections: " + i);
-            clientSocket = acceptClient(serverSocket);
-            handleRequest(clientSocket);
+            try {
+                clientSocket = acceptClient(serverSocket);
+                handleRequest(clientSocket);
+                i++;
+            } catch (IOException e) {
+                logger.warning("Error handling request: " + e.getMessage());
+            }
         }
-        serverSocket.close();
+        try {
+            serverSocket.close();
+        } catch (IOException e) {
+            logger.warning("Could not close the server socket.");
+        }
     }
 
     /**
@@ -55,7 +61,7 @@ public class HttpServer {
     public static void printTrace(BufferedReader in) throws IOException {
         String inputLine;
         while ((inputLine = in.readLine()) != null) {
-            logger.info("Received: " + inputLine);
+            logger.info("----> Request received: " + inputLine);
             if (!in.ready()) {
                 break;
             }
@@ -86,16 +92,56 @@ public class HttpServer {
         BufferedReader in = new BufferedReader( new InputStreamReader( clientSocket.getInputStream()));
         String line = in.readLine();
         if (line == null || line.split(" ").length <= 1) {
-            logger.warning("Invalid request received");
-            sendResponse(new PrintWriter(clientSocket.getOutputStream(), true), "400 Bad Request");
+            logger.warning("Invalid request line: " + line);
+            handleErrorRequest(clientSocket, HttpServerErrors.BAD_REQUEST_400);
             clientSocket.close();
             return;
         }
-        String uri = line.split(" ")[1];
-        handleValidRoute(uri, clientSocket);
+        String[] parts = line.split(" ");
+        String uri = parts[1];
+
+        try {
+            handleValidRoute(uri, clientSocket);
+        } catch (HttpServerErrors e) {
+            logger.warning("Error handling request: " + e.getMessage());
+            handleErrorRequest(clientSocket, e);
+            clientSocket.close();
+        } catch (Exception e) {
+            BufferedOutputStream outData = new BufferedOutputStream(clientSocket.getOutputStream());
+            logger.severe("Unexpected error: " + e.getMessage());
+            sendResponse(new PrintWriter(clientSocket.getOutputStream(), true), outData,"500 Internal Server Error");
+            outData.close();
+        }
         in.close();
         clientSocket.close();
     }
+
+    /**
+     * Handles error requests by sending an appropriate HTTP error response.
+     * It constructs the response based on the provided HttpServerErrors instance.
+     * @param clientSocket the socket connected to the client
+     * @param error the HttpServerErrors instance representing the error
+     * @throws IOException if an I/O error occurs when writing to the socket
+     */
+    public static void handleErrorRequest(Socket clientSocket, HttpServerErrors error) throws IOException {
+        PrintWriter out = new PrintWriter(clientSocket.getOutputStream(), true);
+        BufferedOutputStream outData = new BufferedOutputStream(clientSocket.getOutputStream());
+        byte[] body = error.getMessage().getBytes(StandardCharsets.UTF_8);
+
+        out.println("HTTP/1.1 " + error.CODE + " " + error.getMessage());
+        out.println("Content-Type: text/plain; charset=UTF-8");
+        addCORSHeaders(out);
+        out.println("Content-Length: " + body.length);
+        out.println();
+        out.flush();
+
+        outData.write(body);
+        outData.flush();
+
+        outData.close();
+        out.close();
+    }
+
 
 
     /**
@@ -104,54 +150,42 @@ public class HttpServer {
      * @param uri the requested URI
      * @param clientSocket the socket connected to the client
      * @throws IOException if an I/O error occurs when reading from or writing to the socket
-     *
-     * TODO - Improve the request handling to support more complex routes, different methods and parameters.
      */
     public static void handleValidRoute(String uri, Socket clientSocket) throws IOException {
         PrintWriter out = new PrintWriter(clientSocket.getOutputStream(), true);
         BufferedOutputStream outData = new BufferedOutputStream(clientSocket.getOutputStream());
         String path = uri.split("\\?")[0];
         switch (path) {
-            case "/", "/index.html":
+            case "/":
                 sendFileResponse(out, outData, "/index.html", "text/html");
-                break;
-            case "/favicon.ico":
-                sendFileResponse(out, outData, "/favicon.ico", "image/x-icon");
-                break;
-            case "/styles.css":
-                sendFileResponse(out, outData, "/styles.css", "text/css");
-                break;
-            case "/script.js":
-                sendFileResponse(out, outData, "/script.js", "application/javascript");
                 break;
             case "/stop":
                 stopServer();
-                sendResponse(out, "Server is stopping...");
+                sendResponse(out,outData, "Server is stopping...");
                 break;
             case "/name":
-                sendResponse(out, "Your name is: GUEST USER");
+                sendResponse(out,outData, "The Server name is: TEST SERVER VALUE");
                 break;
             case "/about":
                 sendFileResponse(out, outData, "/about/about.html", "text/html");
                 break;
-            case "/about/styles.css":
-                sendFileResponse(out, outData, "/about/styles.css", "text/css");
-                break;
-            case "/about/script.js":
-                sendFileResponse(out, outData, "/about/script.js", "application/javascript");
+            case "/api":
+                sendFileResponse(out, outData, "/api/api.html", "text/html");
                 break;
             case "/books":
                 if (uri.split("\\?").length > 1 && uri.split("\\?")[1].startsWith("name=")) {
                     String bookName = uri.split("\\?")[1].split("=")[1];
                     saveData(bookName);
                 }
-                sendJSONResponse(out, "Books saved: " + box.toString());
+                sendJSONResponse(out, outData, "{\"message\": \"Books saved: " + box.toString() + "\"}");
                 break;
 
             default:
-                sendResponse(out, "404 Not Found");
+            sendAnyFile(out, outData, path);
+                break;
         }
         outData.close();
+        out.close();
     }
 
     /**
@@ -162,9 +196,12 @@ public class HttpServer {
      * @param filePath the path of the file to be sent
      * @param contentType the content type of the file
      */
-    public static void sendFileResponse(PrintWriter out, BufferedOutputStream outData, String filePath, String contentType) {
+    public static void sendFileResponse(PrintWriter out, BufferedOutputStream outData, String filePath, String contentType) throws IOException {
+        File file = new File(RESOURCES_PATH + filePath);
+        if (!file.exists()) {
+            throw HttpServerErrors.NOT_FOUND_404;
+        }
         try {
-            File file = new File("src/main/resources" + filePath);
             byte[] fileData = new byte[(int) file.length()];
             FileInputStream fileIn = new FileInputStream(file);
             fileIn.read(fileData);
@@ -174,12 +211,37 @@ public class HttpServer {
             out.println("Content-Type: " + contentType);
             out.println("Content-Length: " + fileData.length);
             out.println();
-            out.close();
 
             outData.write(fileData, 0, fileData.length);
         } catch (IOException e) {
             logger.warning("File not found: " + filePath);
-            sendResponse(out, "404 Not Found");
+            sendResponse(out, outData,"404 Not Found");
+        }
+    }
+
+    /**
+     * Sends any file based on the provided file path.
+     * It determines the content type based on the file extension and sends the file response.
+     * @param out the PrintWriter to write the response
+     * @param outData the BufferedOutputStream to write the file data
+     * @param filePath the path of the file to be sent
+     * @throws IOException if an I/O error occurs when reading from or writing to the socket
+     */
+    public static void sendAnyFile(PrintWriter out, BufferedOutputStream outData, String filePath) throws IOException {
+        File file = new File(RESOURCES_PATH+filePath);
+        if (!file.exists()) {
+            throw HttpServerErrors.NOT_FOUND_404;
+        }
+        if(filePath.contains(".png") || filePath.contains(".jpg") || filePath.contains(".jpeg")) {
+            sendFileResponse(out, outData, filePath, "image/png");
+        } else if(filePath.contains(".css")) {
+            sendFileResponse(out, outData, filePath, "text/css");
+        } else if(filePath.contains(".js")) {
+            sendFileResponse(out, outData, filePath, "application/javascript");
+        } else if(filePath.contains(".html")) {
+            sendFileResponse(out, outData, filePath, "text/html");
+        } else {
+            sendFileResponse(out, outData, filePath, "application/octet-stream");
         }
     }
 
@@ -194,33 +256,48 @@ public class HttpServer {
         logger.info("Data saved: " + parsedData);
     }
 
+
     /**
      * Sends a JSON response to the client.
      * It constructs a JSON string and sends it back with the appropriate content type.
      * @param out the PrintWriter to write the response
+     * @param outData the BufferedOutputStream to write the JSON data
      * @param jsonContent the JSON content to be sent
+     * @throws IOException if an I/O error occurs when writing to the socket
      */
-    public static void sendJSONResponse(PrintWriter out, String jsonContent) {
+    public static void sendJSONResponse(PrintWriter out, BufferedOutputStream outData, String jsonContent) throws IOException {
+        byte[] body = jsonContent.getBytes(StandardCharsets.UTF_8);
         out.println("HTTP/1.1 200 OK");
-        out.println("Content-Type: application/json");
-        out.println("Content-Length: " + jsonContent.length());
+        out.println("Content-Type: application/json; charset=UTF-8");
+        addCORSHeaders(out);
+        out.println("Content-Length: " + body.length);
         out.println();
-        out.print(jsonContent);
+        out.flush();
+        outData.write(body);
+        outData.flush();
     }
+
 
     /**
      * Sends a plain text response to the client.
-     * It constructs a response string and sends it back with the appropriate content type.
+     * It constructs a response with the given content and sends it back with the appropriate headers.
      * @param out the PrintWriter to write the response
-     * @param content the content to be sent
+     * @param outData the BufferedOutputStream to write the response data
+     * @param content the content to be sent in the response
+     * @throws IOException if an I/O error occurs when writing to the socket
      */
-    public static void sendResponse(PrintWriter out, String content) {
-        out.println("HTTP/1.1 OK");
-        out.println("Content-Type: text/plain");
-        out.println("Content-Length: " + content.length());
+    public static void sendResponse(PrintWriter out, BufferedOutputStream outData, String content) throws IOException {
+        byte[] body = content.getBytes(StandardCharsets.UTF_8);
+        out.println("HTTP/1.1 200 OK");
+        out.println("Content-Type: text/plain; charset=UTF-8");
+        addCORSHeaders(out);
+        out.println("Content-Length: " + body.length);
         out.println();
-        out.print(content);
+        out.flush();
+        outData.write(body);
+        outData.flush();
     }
+
 
     /**
      * Stops the server by setting the running flag to false.
@@ -229,6 +306,12 @@ public class HttpServer {
     public static void stopServer() {
         running = false;
         logger.info("Server is stopping...");
+    }
+
+    private static void addCORSHeaders(PrintWriter out) {
+        out.println("Access-Control-Allow-Origin: *");
+        out.println("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
+        out.println("Access-Control-Allow-Headers: Content-Type");
     }
 
 
